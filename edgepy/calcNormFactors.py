@@ -10,7 +10,7 @@ def calcNormFactors(counts, lib_size=None, method="none", refColumn=None, lograt
     """
     # check counts
     if len(counts.shape) != 2:
-        
+        raise ValueError("counts must have two dimensions")
     if np.any(np.isnan(counts)):
         raise ValueError("NA counts not permitted")
     nsamples = counts.shape[1]
