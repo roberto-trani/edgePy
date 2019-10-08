@@ -1,6 +1,7 @@
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import scipy.stats
+
 
 def calcNormFactors(counts, lib_size=None, method="none", refColumn=None, logratioTrim=0.3, sumTrim=0.05, doWeighting=True, Acutoff=-1e10, p=0.75):
     """
@@ -56,7 +57,7 @@ def calcNormFactors(counts, lib_size=None, method="none", refColumn=None, lograt
         f = np.full(nsamples, 0.0)
         for i in range(nsamples):
             f[i] = method_fun(
-                counts.iloc[:,i], counts.iloc[:,refColumn], lib_size[i], lib_size[refColumn],
+                counts.iloc[:,i], counts.iloc[:,refColumn], lib_size.iloc[i], lib_size.iloc[refColumn],
                 logratioTrim=logratioTrim, sumTrim=sumTrim, doWeighting=doWeighting, Acutoff=Acutoff
             )
     elif method == "none":
@@ -105,10 +106,15 @@ def _calcFactorTMM(obs, ref, libsize_obs=None, libsize_ref=None, logratioTrim=0.
     nO = obs.sum() if libsize_obs is None else libsize_obs
     nR = ref.sum() if libsize_ref is None else libsize_ref
 
-    logR = np.log2((obs/nO)/(ref/nR))  # log ratio of expression, accounting for library size
-    absE = np.log2(obs/nO) + np.log2(ref/nR) / 2  # absolute expression
-    v = (nO-obs)/nO/obs + (nR-ref)/nR/ref   # estimated asymptotic variance
-    
+    obs_ratio = (obs/nO)
+    ref_ratio = (ref/nR)
+
+    # prevent infinite values. Fix by Roberto
+    fin = ((obs_ratio > 0) & (ref_ratio > 0))
+    logR = np.log2(obs_ratio[fin] / ref_ratio[fin])  # log ratio of expression, accounting for library size
+    absE = np.log2(obs_ratio[fin]) + np.log2(ref_ratio[fin]) / 2  # absolute expression
+    v = (nO-obs[fin])/nO/obs[fin] + (nR-ref[fin])/nR/ref[fin]   # estimated asymptotic variance
+
     # remove infinite values, cutoff based on A
     fin = np.isfinite(logR) & np.isfinite(absE) & (absE > Acutoff)
 
@@ -211,7 +217,7 @@ def _calcFactorTMMwsp(obs, ref, libsize_obs=None, libsize_ref=None, logratioTrim
     ref_p_shrunk = (ref + 0.5) / (libsize_ref + 0.5)
     M_shrunk = np.log2(obs_p_shrunk / ref_p_shrunk)
 
-    order_support = np.array(zip(M, M_shrunk), dtype=[("x", M.dtype), ("y", M_shrunk.dtype)])
+    order_support = np.array(list(zip(M, M_shrunk)), dtype=[("x", M.dtype), ("y", M_shrunk.dtype)])
     o_M = np.argsort(order_support, order=["x", "y"])
     
     # A order
